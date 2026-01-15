@@ -59,6 +59,17 @@ class TweakpaneExtension {
           },
         },
         {
+          opcode: 'addDropdown',
+          blockType: Scratch.BlockType.COMMAND,
+          text: 'Add dropdown to [ID] labeled [LABEL] options [OPTIONS] default [VALUE]',
+          arguments: {
+            ID: { type: Scratch.ArgumentType.STRING, defaultValue: 'myPanel' },
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'scene' },
+            OPTIONS: { type: Scratch.ArgumentType.STRING, defaultValue: 'hello:foo,world:bar' },
+            VALUE: { type: Scratch.ArgumentType.STRING, defaultValue: 'LDG' },
+          },
+        },
+        {
           opcode: 'addButton',
           blockType: Scratch.BlockType.COMMAND,
           text: 'Add button to [ID] labeled [LABEL]',
@@ -84,11 +95,27 @@ class TweakpaneExtension {
           },
         },
         {
+          opcode: 'whenDropdownChanged',
+          blockType: Scratch.BlockType.HAT,
+          text: 'When dropdown [LABEL] is changed',
+          arguments: {
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'scene' },
+          },
+        },
+        {
           opcode: 'getSliderValue',
           blockType: Scratch.BlockType.REPORTER,
           text: 'Value of slider [LABEL]',
           arguments: {
             LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Speed' },
+          },
+        },
+        {
+          opcode: 'getDropdownValue',
+          blockType: Scratch.BlockType.REPORTER,
+          text: 'Value of dropdown [LABEL]',
+          arguments: {
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'scene' },
           },
         },
       ],
@@ -148,6 +175,44 @@ class TweakpaneExtension {
     });
   }
 
+  addDropdown(args) {
+    const { ID, LABEL, OPTIONS, VALUE } = args;
+    const panel = this.panes[ID];
+    if (!panel) return;
+
+    const optionsArr = [];
+    if (typeof OPTIONS === 'string') {
+      const parts = OPTIONS.split(',').map((s) => s.trim()).filter(Boolean);
+      parts.forEach((p) => {
+        const [textPart, valuePart] = p.split(':').map((s) => s.trim());
+        if (valuePart === undefined) {
+          optionsArr.push({ text: textPart, value: textPart });
+        } else {
+          optionsArr.push({ text: textPart, value: valuePart });
+        }
+      });
+    }
+
+    const initialValue = VALUE || (optionsArr[0] && optionsArr[0].value) || '';
+    this.eventValues[LABEL] = initialValue;
+
+    const dropdown = panel.folder.addBlade({
+      view: 'list',
+      label: LABEL,
+      options: optionsArr,
+      value: initialValue,
+    });
+
+    dropdown.on('change', (event) => {
+      this.eventValues[LABEL] = event.value;
+      setTimeout(() => {
+        Scratch.vm.runtime.startHats('tweakpane_whenDropdownChanged', {
+          LABEL,
+        });
+      }, 0);
+    });
+  }
+
   addButton(args) {
     const { ID, LABEL } = args;
     const panel = this.panes[ID];
@@ -187,6 +252,10 @@ class TweakpaneExtension {
 
   getSliderValue(args) {
     return this.eventValues[args.LABEL] || 0;
+  }
+
+  getDropdownValue(args) {
+    return this.eventValues[args.LABEL] || '';
   }
 }
 
