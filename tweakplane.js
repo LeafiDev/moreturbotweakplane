@@ -105,6 +105,49 @@ class TweakpaneExtension {
           },
         },
         {
+          opcode: 'addPoint',
+          blockType: Scratch.BlockType.COMMAND,
+          text: 'Add 2D point picker to [ID] labeled [LABEL] default X [X] Y [Y]',
+          arguments: {
+            ID: { type: Scratch.ArgumentType.STRING, defaultValue: 'myPanel' },
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Point' },
+            X: { type: Scratch.ArgumentType.NUMBER, defaultValue: 0 },
+            Y: { type: Scratch.ArgumentType.NUMBER, defaultValue: 0 },
+          },
+        },
+        {
+          opcode: 'whenPointChanged',
+          blockType: Scratch.BlockType.HAT,
+          text: 'When point [LABEL] is changed',
+          arguments: {
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Point' },
+          },
+        },
+        {
+          opcode: 'getPointValue',
+          blockType: Scratch.BlockType.REPORTER,
+          text: 'Value of point [LABEL]',
+          arguments: {
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Point' },
+          },
+        },
+        {
+          opcode: 'getPointX',
+          blockType: Scratch.BlockType.REPORTER,
+          text: 'X of point [LABEL]',
+          arguments: {
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Point' },
+          },
+        },
+        {
+          opcode: 'getPointY',
+          blockType: Scratch.BlockType.REPORTER,
+          text: 'Y of point [LABEL]',
+          arguments: {
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Point' },
+          },
+        },
+        {
           opcode: 'whenButtonPressed',
           blockType: Scratch.BlockType.HAT,
           text: 'When button [LABEL] is pressed',
@@ -271,6 +314,28 @@ class TweakpaneExtension {
     });
   }
 
+  addPoint(args) {
+    const { ID, LABEL, X, Y } = args;
+    const panel = this.panes[ID];
+    if (!panel) return;
+
+    const initial = { x: typeof X === 'number' ? X : 0, y: typeof Y === 'number' ? Y : 0 };
+    this.eventValues[LABEL] = { x: initial.x, y: initial.y };
+
+    const tmp = { value: { x: initial.x, y: initial.y } };
+    const input = panel.folder.addInput(tmp, 'value', { label: LABEL });
+
+    input.on('change', () => {
+      const v = tmp.value || { x: 0, y: 0 };
+      this.eventValues[LABEL] = { x: Number(v.x) || 0, y: Number(v.y) || 0 };
+      setTimeout(() => {
+        Scratch.vm.runtime.startHats('tweakpane_whenPointChanged', {
+          LABEL,
+        });
+      }, 0);
+    });
+  }
+
   addButton(args) {
     const { ID, LABEL } = args;
     const panel = this.panes[ID];
@@ -291,6 +356,10 @@ class TweakpaneExtension {
 
   whenColorChanged() {
     // Event fires automatically when the color value changes
+  }
+
+  whenPointChanged() {
+    // Event fires automatically when the point value changes
   }
 
   removeAllPanels() {
@@ -323,6 +392,23 @@ class TweakpaneExtension {
   getColorValue(args) {
     return this.eventValues[args.LABEL] || '#ffffff';
   }
+
+  getPointValue(args) {
+    const v = this.eventValues[args.LABEL] || { x: 0, y: 0 };
+    return `${v.x},${v.y}`;
+  }
+
+  getPointX(args) {
+    const v = this.eventValues[args.LABEL];
+    return v && typeof v.x === 'number' ? v.x : 0;
+  }
+
+  getPointY(args) {
+    const v = this.eventValues[args.LABEL];
+    return v && typeof v.y === 'number' ? v.y : 0;
+  }
 }
+  
+
 
 Scratch.extensions.register(new TweakpaneExtension());
