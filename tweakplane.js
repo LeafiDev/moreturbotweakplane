@@ -59,6 +59,15 @@ class TweakpaneExtension {
           },
         },
         {
+          opcode: 'addButton',
+          blockType: Scratch.BlockType.COMMAND,
+          text: 'Add button to [ID] labeled [LABEL]',
+          arguments: {
+            ID: { type: Scratch.ArgumentType.STRING, defaultValue: 'myPanel' },
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Click Me' },
+          },
+        },
+        {
           opcode: 'addDropdown',
           blockType: Scratch.BlockType.COMMAND,
           text: 'Add dropdown to [ID] labeled [LABEL] options [OPTIONS] default [VALUE]',
@@ -70,12 +79,29 @@ class TweakpaneExtension {
           },
         },
         {
-          opcode: 'addButton',
+          opcode: 'addColor',
           blockType: Scratch.BlockType.COMMAND,
-          text: 'Add button to [ID] labeled [LABEL]',
+          text: 'Add color picker to [ID] labeled [LABEL] default [VALUE]',
           arguments: {
             ID: { type: Scratch.ArgumentType.STRING, defaultValue: 'myPanel' },
-            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Click Me' },
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Tint' },
+            VALUE: { type: Scratch.ArgumentType.STRING, defaultValue: '#ffffff' },
+          },
+        },
+        {
+          opcode: 'whenColorChanged',
+          blockType: Scratch.BlockType.HAT,
+          text: 'When color [LABEL] is changed',
+          arguments: {
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Tint' },
+          },
+        },
+        {
+          opcode: 'getColorValue',
+          blockType: Scratch.BlockType.REPORTER,
+          text: 'Value of color [LABEL]',
+          arguments: {
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Tint' },
           },
         },
         {
@@ -213,6 +239,38 @@ class TweakpaneExtension {
     });
   }
 
+  addColor(args) {
+    const { ID, LABEL, VALUE } = args;
+    const panel = this.panes[ID];
+    if (!panel) return;
+
+    const initialValue = VALUE || '#ffffff';
+    this.eventValues[LABEL] = initialValue;
+
+    // Use an unbound temporary object and add an input for its `value` property.
+    // This uses Tweakpane's color input plugins (string/object/number) instead
+    // of relying on a `color` blade view which may not be registered.
+    const tmp = { value: initialValue };
+    const input = panel.folder.addInput(tmp, 'value', { label: LABEL });
+
+    input.on('change', (event) => {
+      // Normalize stored value to a hex string when possible.
+      let v = tmp.value;
+      if (v && typeof v === 'object' && 'r' in v && 'g' in v && 'b' in v) {
+        const r = Math.max(0, Math.min(255, Math.round(v.r)));
+        const g = Math.max(0, Math.min(255, Math.round(v.g)));
+        const b = Math.max(0, Math.min(255, Math.round(v.b)));
+        v = `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+      }
+      this.eventValues[LABEL] = v;
+      setTimeout(() => {
+        Scratch.vm.runtime.startHats('tweakpane_whenColorChanged', {
+          LABEL,
+        });
+      }, 0);
+    });
+  }
+
   addButton(args) {
     const { ID, LABEL } = args;
     const panel = this.panes[ID];
@@ -229,6 +287,10 @@ class TweakpaneExtension {
         });
       }, 0);
     });
+  }
+
+  whenColorChanged() {
+    // Event fires automatically when the color value changes
   }
 
   removeAllPanels() {
@@ -256,6 +318,10 @@ class TweakpaneExtension {
 
   getDropdownValue(args) {
     return this.eventValues[args.LABEL] || '';
+  }
+
+  getColorValue(args) {
+    return this.eventValues[args.LABEL] || '#ffffff';
   }
 }
 
