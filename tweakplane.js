@@ -59,6 +59,16 @@ class TweakpaneExtension {
           },
         },
         {
+          opcode: 'addBoolean',
+          blockType: Scratch.BlockType.COMMAND,
+          text: 'Add boolean to [ID] labeled [LABEL] default [VALUE]',
+          arguments: {
+            ID: { type: Scratch.ArgumentType.STRING, defaultValue: 'myPanel' },
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Enabled' },
+            VALUE: { type: Scratch.ArgumentType.STRING, defaultValue: 'false' },
+          },
+        },
+        {
           opcode: 'addButton',
           blockType: Scratch.BlockType.COMMAND,
           text: 'Add button to [ID] labeled [LABEL]',
@@ -89,22 +99,6 @@ class TweakpaneExtension {
           },
         },
         {
-          opcode: 'whenColorChanged',
-          blockType: Scratch.BlockType.HAT,
-          text: 'When color [LABEL] is changed',
-          arguments: {
-            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Tint' },
-          },
-        },
-        {
-          opcode: 'getColorValue',
-          blockType: Scratch.BlockType.REPORTER,
-          text: 'Value of color [LABEL]',
-          arguments: {
-            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Tint' },
-          },
-        },
-        {
           opcode: 'addPoint',
           blockType: Scratch.BlockType.COMMAND,
           text: 'Add 2D point picker to [ID] labeled [LABEL] default X [X] Y [Y]',
@@ -116,19 +110,32 @@ class TweakpaneExtension {
           },
         },
         {
-          opcode: 'whenPointChanged',
-          blockType: Scratch.BlockType.HAT,
-          text: 'When point [LABEL] is changed',
+          opcode: 'addNumber',
+          blockType: Scratch.BlockType.COMMAND,
+          text: 'Add number input to [ID] labeled [LABEL] default [VALUE]',
           arguments: {
-            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Point' },
+            ID: { type: Scratch.ArgumentType.STRING, defaultValue: 'myPanel' },
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Count' },
+            VALUE: { type: Scratch.ArgumentType.NUMBER, defaultValue: 0 },
           },
         },
         {
-          opcode: 'getPointValue',
-          blockType: Scratch.BlockType.REPORTER,
-          text: 'Value of point [LABEL]',
+          opcode: 'addString',
+          blockType: Scratch.BlockType.COMMAND,
+          text: 'Add string input to [ID] labeled [LABEL] default [VALUE]',
           arguments: {
-            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Point' },
+            ID: { type: Scratch.ArgumentType.STRING, defaultValue: 'myPanel' },
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Text' },
+            VALUE: { type: Scratch.ArgumentType.STRING, defaultValue: '' },
+          },
+        },
+        '---',
+        {
+          opcode: 'getColorValue',
+          blockType: Scratch.BlockType.REPORTER,
+          text: 'Value of color [LABEL]',
+          arguments: {
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Tint' },
           },
         },
         {
@@ -147,30 +154,7 @@ class TweakpaneExtension {
             LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Point' },
           },
         },
-        {
-          opcode: 'whenButtonPressed',
-          blockType: Scratch.BlockType.HAT,
-          text: 'When button [LABEL] is pressed',
-          arguments: {
-            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Click Me' },
-          },
-        },
-        {
-          opcode: 'whenSliderChanged',
-          blockType: Scratch.BlockType.HAT,
-          text: 'When slider [LABEL] is changed',
-          arguments: {
-            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Speed' },
-          },
-        },
-        {
-          opcode: 'whenDropdownChanged',
-          blockType: Scratch.BlockType.HAT,
-          text: 'When dropdown [LABEL] is changed',
-          arguments: {
-            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'scene' },
-          },
-        },
+
         {
           opcode: 'getSliderValue',
           blockType: Scratch.BlockType.REPORTER,
@@ -187,6 +171,55 @@ class TweakpaneExtension {
             LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'scene' },
           },
         },
+        {
+          opcode: 'getNumberValue',
+          blockType: Scratch.BlockType.REPORTER,
+          text: 'Value of number [LABEL]',
+          arguments: {
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Count' },
+          },
+        },
+        {
+          opcode: 'getStringValue',
+          blockType: Scratch.BlockType.REPORTER,
+          text: 'Value of string [LABEL]',
+          arguments: {
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Text' },
+          },
+        },
+        {
+          opcode: 'getBooleanValue',
+          blockType: Scratch.BlockType.REPORTER,
+          text: 'Value of boolean [LABEL]',
+          arguments: {
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Enabled' },
+          },
+        },
+        '---',
+        {
+          opcode: 'whenButtonPressed',
+          blockType: Scratch.BlockType.HAT,
+          text: 'When button [LABEL] is pressed',
+          arguments: {
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Click Me' },
+          },
+        },
+        {
+          opcode: 'whenNumberChanged',
+          blockType: Scratch.BlockType.HAT,
+          text: 'When number [LABEL] changed',
+          arguments: {
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Count' },
+          },
+        },
+        {
+          opcode: 'whenStringChanged',
+          blockType: Scratch.BlockType.HAT,
+          text: 'When string [LABEL] changed',
+          arguments: {
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Text' },
+          },
+        },
       ],
     };
   }
@@ -198,7 +231,7 @@ class TweakpaneExtension {
     }
 
     const { ID, TITLE, X, Y } = args;
-    if (this.panes[ID]) return; // Prevent duplicate panels
+    if (this.panes[ID]) return; 
 
     const pane = new window.Tweakpane.Pane();
     pane.element.style.position = 'absolute';
@@ -290,14 +323,10 @@ class TweakpaneExtension {
     const initialValue = VALUE || '#ffffff';
     this.eventValues[LABEL] = initialValue;
 
-    // Use an unbound temporary object and add an input for its `value` property.
-    // This uses Tweakpane's color input plugins (string/object/number) instead
-    // of relying on a `color` blade view which may not be registered.
     const tmp = { value: initialValue };
     const input = panel.folder.addInput(tmp, 'value', { label: LABEL });
 
     input.on('change', (event) => {
-      // Normalize stored value to a hex string when possible.
       let v = tmp.value;
       if (v && typeof v === 'object' && 'r' in v && 'g' in v && 'b' in v) {
         const r = Math.max(0, Math.min(255, Math.round(v.r)));
@@ -332,6 +361,65 @@ class TweakpaneExtension {
         Scratch.vm.runtime.startHats('tweakpane_whenPointChanged', {
           LABEL,
         });
+      }, 0);
+    });
+  }
+
+  addBoolean(args) {
+    const { ID, LABEL, VALUE } = args;
+    const panel = this.panes[ID];
+    if (!panel) return;
+
+    const initialValue = (VALUE === 'true' || VALUE === true) ? true : false;
+    this.eventValues[LABEL] = initialValue;
+
+    const tmp = { value: initialValue };
+    const input = panel.folder.addInput(tmp, 'value', { label: LABEL });
+
+    input.on('change', (event) => {
+      this.eventValues[LABEL] = !!tmp.value;
+      setTimeout(() => {
+        Scratch.vm.runtime.startHats('tweakpane_whenBooleanChanged', {
+          LABEL,
+        });
+      }, 0);
+    });
+  }
+
+  addNumber(args) {
+    const { ID, LABEL, VALUE } = args;
+    const panel = this.panes[ID];
+    if (!panel) return;
+
+    const initial = typeof VALUE === 'number' ? VALUE : Number(VALUE) || 0;
+    this.eventValues[LABEL] = initial;
+
+    const tmp = { value: initial };
+    const input = panel.folder.addInput(tmp, 'value', { label: LABEL });
+
+    input.on('change', () => {
+      this.eventValues[LABEL] = Number(tmp.value) || 0;
+      setTimeout(() => {
+        Scratch.vm.runtime.startHats('tweakpane_whenNumberChanged', { LABEL });
+      }, 0);
+    });
+  }
+
+  addString(args) {
+    const { ID, LABEL, VALUE } = args;
+    const panel = this.panes[ID];
+    if (!panel) return;
+
+    const initial = (VALUE != null) ? String(VALUE) : '';
+    this.eventValues[LABEL] = initial;
+
+    const tmp = { value: initial };
+    const input = panel.folder.addInput(tmp, 'value', { label: LABEL });
+
+    input.on('change', () => {
+      this.eventValues[LABEL] = String(tmp.value || '');
+      setTimeout(() => {
+        Scratch.vm.runtime.startHats('tweakpane_whenStringChanged', { LABEL });
       }, 0);
     });
   }
@@ -385,12 +473,22 @@ class TweakpaneExtension {
     return this.eventValues[args.LABEL] || 0;
   }
 
+  getNumberValue(args) {
+    const v = this.eventValues[args.LABEL];
+    return typeof v === 'number' ? v : Number(v) || 0;
+  }
+
   getDropdownValue(args) {
     return this.eventValues[args.LABEL] || '';
   }
 
   getColorValue(args) {
     return this.eventValues[args.LABEL] || '#ffffff';
+  }
+
+  getStringValue(args) {
+    const v = this.eventValues[args.LABEL];
+    return v != null ? String(v) : '';
   }
 
   getPointValue(args) {
@@ -406,6 +504,10 @@ class TweakpaneExtension {
   getPointY(args) {
     const v = this.eventValues[args.LABEL];
     return v && typeof v.y === 'number' ? v.y : 0;
+  }
+
+  getBooleanValue(args) {
+    return !!this.eventValues[args.LABEL];
   }
 }
   
