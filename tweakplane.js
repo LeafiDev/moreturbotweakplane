@@ -129,6 +129,14 @@ class TweakpaneExtension {
             VALUE: { type: Scratch.ArgumentType.STRING, defaultValue: '' },
           },
         },
+        {
+          opcode: 'addSeparator',
+          blockType: Scratch.BlockType.COMMAND,
+          text: 'Add separator to [ID]',
+          arguments: {
+            ID: { type: Scratch.ArgumentType.STRING, defaultValue: 'myPanel' },
+          },
+        },
         '---',
         {
           opcode: 'getColorValue',
@@ -439,6 +447,16 @@ class TweakpaneExtension {
           LABEL,
         });
       }, 0);
+    });
+  }
+
+  addSeparator(args) {
+    const { ID } = args;
+    const panel = this.panes[ID];
+    if (!panel) return;
+
+    panel.folder.addBlade({
+      view: 'separator',
     });
   }
 
