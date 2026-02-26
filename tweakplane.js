@@ -4,10 +4,11 @@ class Tweakpane {
   constructor(runtime) {
     this.runtime = runtime;
     this.panes = {};
-    this.tabs = {}; // Store tab components: {tabID: {pane, pages: {pageName: tab}}}
+    this.tabs = {};
     this.tweakpaneReady = false;
-    this.eventValues = {}; // Store event values
-    this.buttonPressQueue = []; // Queue of button labels that were pressed
+    this.eventValues = {};
+    this.buttonPressQueue = [];
+    this.paneFoldStates = {};
 
     this.loadTweakpane();
   }
@@ -34,9 +35,9 @@ class Tweakpane {
     return {
       id: 'tweakpane',
       name: 'Tweakpane UI',
-      color1: '#28292e', // pure red
-      color2: '#28292e', // pure green
-      color3: '#bbbdc4', // pure blue
+      color1: '#28292e',
+      color2: '#28292e',
+      color3: '#bbbdc4',
       menuIconURL: icon,
       blockIconURI: icon,
       blocks: [
@@ -102,6 +103,31 @@ class Tweakpane {
             ID: { type: Scratch.ArgumentType.STRING, defaultValue: 'myPanel' },
             TAB_LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Options' },
             PAGE: { type: Scratch.ArgumentType.STRING, defaultValue: 'Settings' },
+          },
+        },
+        {
+          opcode: 'foldersLabel',
+          blockType: Scratch.BlockType.LABEL,
+          text: 'Folders',
+        },
+        {
+          opcode: 'addFolder',
+          blockType: Scratch.BlockType.COMMAND,
+          text: 'Add folder [LABEL] to panel [ID] expanded [EXPANDED]',
+          arguments: {
+            ID: { type: Scratch.ArgumentType.STRING, defaultValue: 'myPanel' },
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Settings' },
+            EXPANDED: { type: Scratch.ArgumentType.STRING, defaultValue: 'true' },
+          },
+        },
+        {
+          opcode: 'moveElementToFolder',
+          blockType: Scratch.BlockType.COMMAND,
+          text: 'Move element [LABEL] to folder [FOLDER] in panel [ID]',
+          arguments: {
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Value' },
+            ID: { type: Scratch.ArgumentType.STRING, defaultValue: 'myPanel' },
+            FOLDER: { type: Scratch.ArgumentType.STRING, defaultValue: 'Settings' },
           },
         },
         {
@@ -203,6 +229,14 @@ class Tweakpane {
           text: 'Value Retrieval',
         },
         {
+          opcode: 'isPaneOpen',
+          blockType: Scratch.BlockType.BOOLEAN,
+          text: 'Pane [ID] is open?',
+          arguments: {
+            ID: { type: Scratch.ArgumentType.STRING, defaultValue: 'myPanel' },
+          },
+        },
+        {
           opcode: 'getColorValue',
           blockType: Scratch.BlockType.REPORTER,
           text: 'Value of color [LABEL]',
@@ -269,6 +303,21 @@ class Tweakpane {
         },
         '---',
         {
+          opcode: 'text11',
+          blockType: Scratch.BlockType.LABEL,
+          text: 'Value Setting',
+        },
+        {
+          opcode: 'setInputValue',
+          blockType: Scratch.BlockType.COMMAND,
+          text: 'Set [LABEL] to [VALUE]',
+          arguments: {
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Count' },
+            VALUE: { type: Scratch.ArgumentType.STRING, defaultValue: '0' },
+          },
+        },
+        '---',
+        {
           opcode: 'text10',
           blockType: Scratch.BlockType.LABEL,
           text: 'Hats',
@@ -279,6 +328,22 @@ class Tweakpane {
           text: 'When button [LABEL] is pressed',
           arguments: {
             LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Click Me' },
+          },
+        },
+        {
+          opcode: 'whenPaneExpanded',
+          blockType: Scratch.BlockType.HAT,
+          text: 'When pane [ID] is expanded',
+          arguments: {
+            ID: { type: Scratch.ArgumentType.STRING, defaultValue: 'myPanel' },
+          },
+        },
+        {
+          opcode: 'whenPaneCollapsed',
+          blockType: Scratch.BlockType.HAT,
+          text: 'When pane [ID] is collapsed',
+          arguments: {
+            ID: { type: Scratch.ArgumentType.STRING, defaultValue: 'myPanel' },
           },
         },
       ],
@@ -301,7 +366,8 @@ class Tweakpane {
 
     const stage = document.querySelector('.stage_stage_1fD7k');
     if (stage) {
-      stage.appendChild(pane.element);
+      Scratch.renderer.addOverlay(pane.element, "scale")
+      pane.element.style.pointerEvents = 'auto';
     } else {
       document.body.appendChild(pane.element);
     }
@@ -310,16 +376,26 @@ class Tweakpane {
       title: TITLE,
     });
 
+    this.paneFoldStates[ID] = { expanded: folder.expanded, justToggled: false };
+
+    folder.on('fold', () => {
+      this.paneFoldStates[ID].expanded = false;
+      this.paneFoldStates[ID].justToggled = 'collapsed';
+    });
+
+    folder.on('unfold', () => {
+      this.paneFoldStates[ID].expanded = true;
+      this.paneFoldStates[ID].justToggled = 'expanded';
+    });
+
     this.panes[ID] = { pane, folder };
   }
 
   createTab(args) {
-    // Deprecated - tabs are now created within panels using addTabToPanel
     console.warn('createTab is deprecated. Use addTabToPanel instead.');
   }
 
   moveElementToTab(args) {
-    // Deprecated - use moveElementToTabPage instead
     console.warn('moveElementToTab is deprecated. Use moveElementToTabPage instead.');
   }
 
@@ -331,7 +407,6 @@ class Tweakpane {
       return;
     }
 
-    // Add tab to the panel - first page uses LABEL
     const tab = panel.pane.addTab({
       pages: [
         { title: LABEL },
@@ -352,24 +427,18 @@ class Tweakpane {
     }
 
     const tabData = this.panelTabs[ID][TAB_LABEL];
-    
-    // Tweakpane tabs: pages array contains the pages, but we can't add dynamically
-    // We need to recreate the tab with the new pages
     const currentPages = Object.keys(tabData.pages).map(name => ({ title: name }));
     currentPages.push({ title: PAGE });
 
-    // Dispose old tab
     if (tabData.tab && tabData.tab.dispose) {
       tabData.tab.dispose();
     }
 
-    // Create new tab with updated pages
     const panel = this.panes[ID];
     const newTab = panel.pane.addTab({
       pages: currentPages,
     });
 
-    // Rebuild pages map
     const newPages = {};
     currentPages.forEach((pageConfig, index) => {
       newPages[pageConfig.title] = newTab.pages[index];
@@ -399,21 +468,76 @@ class Tweakpane {
       return;
     }
 
-    // Remove the input from its current location
     if (elementData.input && elementData.input.dispose) {
       elementData.input.dispose();
     }
 
-    // Re-add the input to the tab page
     const tmp = elementData.obj;
     const newInput = page.addInput(tmp, 'value', {
       label: LABEL,
     });
 
-    // Update element reference
     this.elements[LABEL].input = newInput;
 
-    // Re-attach change listener
+    newInput.on('change', () => {
+      const currentValue = tmp.value;
+      if (typeof currentValue === 'number') {
+        this.eventValues[LABEL] = Number(currentValue) || 0;
+      } else if (typeof currentValue === 'string') {
+        this.eventValues[LABEL] = String(currentValue || '');
+      } else if (typeof currentValue === 'boolean') {
+        this.eventValues[LABEL] = !!currentValue;
+      } else {
+        this.eventValues[LABEL] = currentValue;
+      }
+    });
+  }
+
+  addFolder(args) {
+    const { ID, LABEL, EXPANDED } = args;
+    const panel = this.panes[ID];
+    if (!panel) {
+      console.warn(`Panel "${ID}" not found`);
+      return;
+    }
+
+    const isExpanded = EXPANDED === 'true' || EXPANDED === true;
+    const folder = panel.folder.addFolder({
+      title: LABEL,
+      expanded: isExpanded,
+    });
+
+    if (!this.folders) this.folders = {};
+    if (!this.folders[ID]) this.folders[ID] = {};
+    this.folders[ID][LABEL] = folder;
+  }
+
+  moveElementToFolder(args) {
+    const { LABEL, ID, FOLDER } = args;
+
+    if (!this.folders || !this.folders[ID] || !this.folders[ID][FOLDER]) {
+      console.warn(`Folder "${FOLDER}" not found in panel "${ID}"`);
+      return;
+    }
+
+    const folderObj = this.folders[ID][FOLDER];
+    const elementData = this.elements?.[LABEL];
+    if (!elementData) {
+      console.warn(`Element "${LABEL}" not found`);
+      return;
+    }
+
+    if (elementData.input && elementData.input.dispose) {
+      elementData.input.dispose();
+    }
+
+    const tmp = elementData.obj;
+    const newInput = folderObj.addInput(tmp, 'value', {
+      label: LABEL,
+    });
+
+    this.elements[LABEL].input = newInput;
+
     newInput.on('change', () => {
       const currentValue = tmp.value;
       if (typeof currentValue === 'number') {
@@ -443,7 +567,6 @@ class Tweakpane {
       max: MAX,
     });
 
-    // Store reference to the element for moving to tabs
     if (!this.elements) this.elements = {};
     this.elements[LABEL] = { input: slider, obj: tmp };
 
@@ -623,7 +746,6 @@ class Tweakpane {
   }
 
   whenButtonPressed(args) {
-    // Check if the button that was pressed matches this block's label
     if (this.buttonPressQueue.length === 0) {
       return false;
     }
@@ -631,11 +753,48 @@ class Tweakpane {
     const pressedLabel = this.buttonPressQueue[0];
     
     if (pressedLabel === args.LABEL) {
-      this.buttonPressQueue.shift(); // Remove from queue
+      this.buttonPressQueue.shift();
       return true;
     }
     
     return false;
+  }
+
+  whenPaneExpanded(args) {
+    const state = this.paneFoldStates[args.ID];
+    if (!state) {
+      return false;
+    }
+    
+    if (state.justToggled === 'expanded') {
+      state.justToggled = false;
+      return true;
+    }
+    
+    return false;
+  }
+
+  whenPaneCollapsed(args) {
+    const state = this.paneFoldStates[args.ID];
+    if (!state) {
+      return false;
+    }
+    
+    if (state.justToggled === 'collapsed') {
+      state.justToggled = false;
+      return true;
+    }
+    
+    return false;
+  }
+
+  isPaneOpen(args) {
+    const folder = this.panes[args.ID]?.folder;
+    if (!folder) {
+      return false;
+    }
+    
+    return folder.expanded;
   }
 
   removeAllPanels() {
@@ -689,6 +848,44 @@ class Tweakpane {
   getPointY(args) {
     const v = this.eventValues[args.LABEL];
     return v && typeof v.y === 'number' ? v.y : 0;
+  }
+
+  setInputValue(args) {
+    const { LABEL, VALUE } = args;
+    const elementData = this.elements?.[LABEL];
+    
+    if (!elementData || !elementData.obj) {
+      console.warn(`Input "${LABEL}" not found`);
+      return;
+    }
+
+    const tmp = elementData.obj;
+    const currentValue = tmp.value;
+
+    if (typeof currentValue === 'number') {
+      tmp.value = Number(VALUE) || 0;
+      this.eventValues[LABEL] = tmp.value;
+    } else if (typeof currentValue === 'boolean') {
+      const boolValue = VALUE === 'true' || VALUE === true || VALUE === 1;
+      tmp.value = boolValue;
+      this.eventValues[LABEL] = boolValue;
+    } else if (typeof currentValue === 'string') {
+      tmp.value = String(VALUE);
+      this.eventValues[LABEL] = String(VALUE);
+    } else if (currentValue && typeof currentValue === 'object' && 'x' in currentValue && 'y' in currentValue) {
+      const parts = String(VALUE).split(',').map(p => Number(p.trim()));
+      if (parts.length === 2) {
+        tmp.value = { x: parts[0] || 0, y: parts[1] || 0 };
+        this.eventValues[LABEL] = tmp.value;
+      }
+    } else {
+      tmp.value = VALUE;
+      this.eventValues[LABEL] = VALUE;
+    }
+
+    if (elementData.input && elementData.input.refresh) {
+      elementData.input.refresh();
+    }
   }
 }
 
