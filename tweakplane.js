@@ -4,6 +4,7 @@ class Tweakpane {
   constructor(runtime) {
     this.runtime = runtime;
     this.panes = {};
+    this.tabs = {}; // Store tab components: {tabID: {pane, pages: {pageName: tab}}}
     this.tweakpaneReady = false;
     this.eventValues = {}; // Store event values
     this.buttonPressQueue = []; // Queue of button labels that were pressed
@@ -66,6 +67,41 @@ class Tweakpane {
           text: 'Add separator to [ID]',
           arguments: {
             ID: { type: Scratch.ArgumentType.STRING, defaultValue: 'myPanel' },
+          },
+        },
+        {
+          opcode: 'tabsLabel',
+          blockType: Scratch.BlockType.LABEL,
+          text: 'Tabs',
+        },
+        {
+          opcode: 'addTabToPanel',
+          blockType: Scratch.BlockType.COMMAND,
+          text: 'Add tab to panel [ID] labeled [LABEL]',
+          arguments: {
+            ID: { type: Scratch.ArgumentType.STRING, defaultValue: 'myPanel' },
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Options' },
+          },
+        },
+        {
+          opcode: 'addPageToTab',
+          blockType: Scratch.BlockType.COMMAND,
+          text: 'Add page [PAGE] to tab [TAB_LABEL] in panel [ID]',
+          arguments: {
+            ID: { type: Scratch.ArgumentType.STRING, defaultValue: 'myPanel' },
+            TAB_LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Options' },
+            PAGE: { type: Scratch.ArgumentType.STRING, defaultValue: 'Settings' },
+          },
+        },
+        {
+          opcode: 'moveElementToTabPage',
+          blockType: Scratch.BlockType.COMMAND,
+          text: 'Move element [LABEL] to tab [TAB_LABEL] page [PAGE] in panel [ID]',
+          arguments: {
+            LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Value' },
+            ID: { type: Scratch.ArgumentType.STRING, defaultValue: 'myPanel' },
+            TAB_LABEL: { type: Scratch.ArgumentType.STRING, defaultValue: 'Options' },
+            PAGE: { type: Scratch.ArgumentType.STRING, defaultValue: 'Settings' },
           },
         },
         {
@@ -277,6 +313,121 @@ class Tweakpane {
     this.panes[ID] = { pane, folder };
   }
 
+  createTab(args) {
+    // Deprecated - tabs are now created within panels using addTabToPanel
+    console.warn('createTab is deprecated. Use addTabToPanel instead.');
+  }
+
+  moveElementToTab(args) {
+    // Deprecated - use moveElementToTabPage instead
+    console.warn('moveElementToTab is deprecated. Use moveElementToTabPage instead.');
+  }
+
+  addTabToPanel(args) {
+    const { ID, LABEL } = args;
+    const panel = this.panes[ID];
+    if (!panel) {
+      console.warn(`Panel "${ID}" not found`);
+      return;
+    }
+
+    // Add tab to the panel - first page uses LABEL
+    const tab = panel.pane.addTab({
+      pages: [
+        { title: LABEL },
+      ],
+    });
+
+    if (!this.panelTabs) this.panelTabs = {};
+    if (!this.panelTabs[ID]) this.panelTabs[ID] = {};
+    this.panelTabs[ID][LABEL] = { tab, pages: { [LABEL]: tab.pages[0] } };
+  }
+
+  addPageToTab(args) {
+    const { ID, TAB_LABEL, PAGE } = args;
+    
+    if (!this.panelTabs || !this.panelTabs[ID] || !this.panelTabs[ID][TAB_LABEL]) {
+      console.warn(`Tab "${TAB_LABEL}" not found in panel "${ID}"`);
+      return;
+    }
+
+    const tabData = this.panelTabs[ID][TAB_LABEL];
+    
+    // Tweakpane tabs: pages array contains the pages, but we can't add dynamically
+    // We need to recreate the tab with the new pages
+    const currentPages = Object.keys(tabData.pages).map(name => ({ title: name }));
+    currentPages.push({ title: PAGE });
+
+    // Dispose old tab
+    if (tabData.tab && tabData.tab.dispose) {
+      tabData.tab.dispose();
+    }
+
+    // Create new tab with updated pages
+    const panel = this.panes[ID];
+    const newTab = panel.pane.addTab({
+      pages: currentPages,
+    });
+
+    // Rebuild pages map
+    const newPages = {};
+    currentPages.forEach((pageConfig, index) => {
+      newPages[pageConfig.title] = newTab.pages[index];
+    });
+
+    this.panelTabs[ID][TAB_LABEL] = { tab: newTab, pages: newPages };
+  }
+
+  moveElementToTabPage(args) {
+    const { LABEL, ID, TAB_LABEL, PAGE } = args;
+
+    if (!this.panelTabs || !this.panelTabs[ID] || !this.panelTabs[ID][TAB_LABEL]) {
+      console.warn(`Tab "${TAB_LABEL}" not found in panel "${ID}"`);
+      return;
+    }
+
+    const tabData = this.panelTabs[ID][TAB_LABEL];
+    const page = tabData.pages[PAGE];
+    if (!page) {
+      console.warn(`Page "${PAGE}" not found in tab "${TAB_LABEL}"`);
+      return;
+    }
+
+    const elementData = this.elements?.[LABEL];
+    if (!elementData) {
+      console.warn(`Element "${LABEL}" not found`);
+      return;
+    }
+
+    // Remove the input from its current location
+    if (elementData.input && elementData.input.dispose) {
+      elementData.input.dispose();
+    }
+
+    // Re-add the input to the tab page
+    const tmp = elementData.obj;
+    const newInput = page.addInput(tmp, 'value', {
+      label: LABEL,
+    });
+
+    // Update element reference
+    this.elements[LABEL].input = newInput;
+
+    // Re-attach change listener
+    newInput.on('change', () => {
+      const currentValue = tmp.value;
+      if (typeof currentValue === 'number') {
+        this.eventValues[LABEL] = Number(currentValue) || 0;
+      } else if (typeof currentValue === 'string') {
+        this.eventValues[LABEL] = String(currentValue || '');
+      } else if (typeof currentValue === 'boolean') {
+        this.eventValues[LABEL] = !!currentValue;
+      } else {
+        this.eventValues[LABEL] = currentValue;
+      }
+    });
+  }
+
   addSlider(args) {
     const { ID, LABEL, MIN, MAX } = args;
     const panel = this.panes[ID];
@@ -291,6 +442,10 @@ class Tweakpane {
       min: MIN,
       max: MAX,
     });
+
+    // Store reference to the element for moving to tabs
+    if (!this.elements) this.elements = {};
+    this.elements[LABEL] = { input: slider, obj: tmp };
 
     slider.on('change', () => {
       this.eventValues[LABEL] = Number(tmp.value) || 0;
@@ -324,6 +479,9 @@ class Tweakpane {
       options: optionsArr,
     });
 
+    if (!this.elements) this.elements = {};
+    this.elements[LABEL] = { input: dropdown, obj: tmp };
+
     dropdown.on('change', () => {
       this.eventValues[LABEL] = String(tmp.value || '');
     });
@@ -339,6 +497,9 @@ class Tweakpane {
 
     const tmp = { value: initialValue };
     const input = panel.folder.addInput(tmp, 'value', { label: LABEL });
+
+    if (!this.elements) this.elements = {};
+    this.elements[LABEL] = { input, obj: tmp };
 
     input.on('change', (event) => {
       let v = tmp.value;
@@ -363,6 +524,9 @@ class Tweakpane {
     const tmp = { value: { x: initial.x, y: initial.y } };
     const input = panel.folder.addInput(tmp, 'value', { label: LABEL });
 
+    if (!this.elements) this.elements = {};
+    this.elements[LABEL] = { input, obj: tmp };
+
     input.on('change', () => {
       const v = tmp.value || { x: 0, y: 0 };
       this.eventValues[LABEL] = { x: Number(v.x) || 0, y: Number(v.y) || 0 };
@@ -380,6 +544,9 @@ class Tweakpane {
     const tmp = { value: initialValue };
     const input = panel.folder.addInput(tmp, 'value', { label: LABEL });
 
+    if (!this.elements) this.elements = {};
+    this.elements[LABEL] = { input, obj: tmp };
+
     input.on('change', (event) => {
       this.eventValues[LABEL] = !!tmp.value;
     });
@@ -395,6 +562,9 @@ class Tweakpane {
 
     const tmp = { value: initial };
     const input = panel.folder.addInput(tmp, 'value', { label: LABEL });
+
+    if (!this.elements) this.elements = {};
+    this.elements[LABEL] = { input, obj: tmp };
 
     input.on('change', () => {
       this.eventValues[LABEL] = Number(tmp.value) || 0;
@@ -412,6 +582,9 @@ class Tweakpane {
     const tmp = { value: initial };
     const input = panel.folder.addInput(tmp, 'value', { label: LABEL });
 
+    if (!this.elements) this.elements = {};
+    this.elements[LABEL] = { input, obj: tmp };
+
     input.on('change', () => {
       this.eventValues[LABEL] = String(tmp.value || '');
     });
@@ -426,8 +599,10 @@ class Tweakpane {
       title: LABEL,
     });
 
+    if (!this.elements) this.elements = {};
+    this.elements[LABEL] = { button };
+
     button.on('click', () => {
-      // Add to queue for hat block to check
       this.buttonPressQueue.push(LABEL);
       if (Scratch && Scratch.vm && Scratch.vm.runtime) {
         setTimeout(() => {
